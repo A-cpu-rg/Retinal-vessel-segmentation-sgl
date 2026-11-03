@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments and secrets
+.venv/
+venv/
+env/
+.env
+
+# Editors and Jupyter
+.ipynb_checkpoints/
+.idea/
+.vscode/
+
+# Dataset (DRIVE may not be redistributed)
+data/
+DRIVE/
+*.zip
+
+# Checkpoints and model weights
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+
+# Outputs: pseudo-labels, results, prediction images, logs
+outputs/
+*.log
+
+# Temporary files
+*.tmp
+tmp/
+*.swp
+*~
