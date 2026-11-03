@@ -20,7 +20,7 @@ Prerak Arya (230039) · Abhishek Meena (230137)
 | **Dataset** | DRIVE: 40 fundus photos (20 train, 20 test), 565 × 584 px |
 | **Model** | EnhanceNet → SegNet, two U-Nets in a row |
 | **Training idea** | Study Group Learning (SGL): models create pseudo-labels for each other |
-| **Status** | Pipeline complete and runs end to end · full DRIVE run in progress |
+| **Status** | Pipeline complete and runs end to end · full DRIVE run still to do |
 
 ![Pipeline: training with SGL produces the weights; each new photo goes through EnhanceNet and SegNet to give a vessel map.](assets/architecture.svg)
 
