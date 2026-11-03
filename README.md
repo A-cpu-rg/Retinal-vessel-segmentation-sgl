@@ -1,222 +1,164 @@
-# Retinal Vessel Segmentation with Study Group Learning (SGL)
+<div align="center">
 
-This project finds the blood vessels in a photo of the back of the eye, pixel
-by pixel. It is a PyTorch reproduction of the MICCAI 2021 paper *Study Group
-Learning*, using the DRIVE dataset.
+# 👁️ Retinal Vessel Segmentation · Study Group Learning
 
-> **Status:** the code runs from start to finish. The real DRIVE experiment has
-> **not** been run yet, so this README reports no results of its own.
+**Computer Vision Project**
 
-![How the project works: a retina photo goes through image enhancement and vessel segmentation to give a vessel map. The model is trained once with Study Group Learning.](assets/architecture.svg)
+Prerak Arya (230039) · Abhishek Meena (230137)
 
-<details>
-<summary>Editable version of the diagram (Mermaid)</summary>
+*A PyTorch reproduction of* Study Group Learning *(Zhou, Yu & Shi, MICCAI 2021) on the DRIVE dataset*
 
-```mermaid
-flowchart TB
-    subgraph TRAIN["Training with Study Group Learning (done once)"]
-        direction LR
-        T1["Training photos<br/>+ manual labels"] --> T2["K-fold model training<br/>K = 8 groups"]
-        T2 --> T3["Pseudo-label<br/>generation"]
-        T3 --> T4["Training with SGL<br/>manual + pseudo-labels"]
-        T1 --> T4
-        T4 --> T5["Final vessel model"]
-    end
-    subgraph PRED["Prediction (every new photo)"]
-        direction LR
-        P1["Retina photo"] --> P2["Image enhancement<br/>EnhanceNet (U-Net)"]
-        P2 --> P3["Vessel segmentation<br/>SegNet (U-Net)"]
-        P3 --> P4["Vessel map"]
-    end
-    TRAIN -- "trained weights" --> PRED
+</div>
 
-    classDef data fill:#ffffff,stroke:#94a3b8,color:#0f172a
-    classDef model fill:#2563eb,stroke:#1e3a8a,color:#ffffff
-    classDef sgl fill:#0f766e,stroke:#134e4a,color:#ffffff
-    class T1,P1,P4 data
-    class P2,P3,T5 model
-    class T2,T3,T4 sgl
-    style TRAIN fill:#f0fdfa,stroke:#5eead4,color:#0f172a
-    style PRED fill:#eff6ff,stroke:#93c5fd,color:#0f172a
-    linkStyle default stroke:#64748b,stroke-width:2px
+---
+
+## At a glance
+
+| | |
+|---|---|
+| **Task** | Mark every blood-vessel pixel in a colour photo of the retina |
+| **Dataset** | DRIVE: 40 fundus photos (20 train, 20 test), 565 × 584 px |
+| **Model** | EnhanceNet → SegNet, two U-Nets in a row |
+| **Training idea** | Study Group Learning (SGL): models create pseudo-labels for each other |
+| **Status** | Pipeline complete and runs end to end · full DRIVE run in progress |
+
+![Pipeline: training with SGL produces the weights; each new photo goes through EnhanceNet and SegNet to give a vessel map.](assets/architecture.svg)
+
+## Hypothesis
+
+Human annotators trace thick vessels well but skip many thin ones. A network trained only on
+their labels learns the same blind spots.
+
+> **We expect** that pseudo-labels from a "study group" of models, each labelling images it never
+> trained on, recover those missed vessels. Training on manual labels plus pseudo-labels should
+> raise **sensitivity** while keeping **specificity** about the same.
+
+## Results
+
+All scores are on the 20 DRIVE test images, measured inside the eye area (field of view),
+with 8 flips averaged and a threshold of 100/255. The test set is used once, at the end.
+
+| Metric | Paper (Zhou et al., 2021) | **This project** |
+|---|:---:|:---:|
+| Accuracy | 0.9705 | ⏳ |
+| Sensitivity | 0.8380 | ⏳ |
+| Specificity | 0.9834 | ⏳ |
+| AUC | 0.9886 | ⏳ |
+| F1 / Dice | 0.8316 | ⏳ |
+| IoU (vessel) | – | ⏳ |
+
+⏳ = filled in from `outputs/test_results.json` once the full run finishes.
+The paper's column is the target, not our output.
+
+**How we will test the hypothesis:** compare the SGL model against the same network trained
+without pseudo-labels (`train.py` with no `--teacher-dir`). The hypothesis holds if SGL gives
+higher sensitivity at similar specificity.
+
+## How Study Group Learning works
+
+```
+20 training images ──► split into K = 8 groups
+                         │
+        for each group g │  train on the other 7 groups
+                         ▼  predict group g  ──►  pseudo-labels (never seen by that model)
+                         │
+final model ◄── loss = BCE(pred, manual label) + BCE(pred, pseudo-label)
 ```
 
-</details>
+SGL changes only training. At prediction time a photo goes through one network once:
+**EnhanceNet** cleans up the image, **SegNet** outputs a vessel probability map.
 
-## What the project does
+## Run it
 
-- **Input:** a colour photo of the retina (the back of the eye).
-- **Output:** a vessel map, where white means "blood vessel". It also saves a
-  probability map and an overlay on the original photo.
-- **Training method:** Study Group Learning. Several models label each other's
-  images, which helps with vessels that the human annotators missed.
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 
-## Dataset: DRIVE
+# everything: pseudo-labels → final model → one test evaluation
+python src/run_sgl.py --k 8 --fold-epochs 15 --final-epochs 25
 
-[DRIVE](https://drive.grand-challenge.org/) has 40 retina photos (20 for
-training and 20 for testing), each 565 × 584 pixels. Each photo comes with:
-- vessels drawn by hand;
-- a mask of the round area that shows the eye.
+# vessel map for your own photo
+python src/infer.py --ckpt checkpoints/final/last.pt \
+    --images data/DRIVE/test/images/01_test.tif --masks data/DRIVE/test/mask/01_test_mask.gif
+```
 
-The dataset is **not included** in this repository. Download it and place it
-like this (these are the original DRIVE file names):
+The device is picked automatically (CUDA → Apple MPS → CPU). On Google Colab, choose a GPU
+runtime and add `--device cuda --workers 2`. Every script has `--help`.
+
+<details>
+<summary>Dataset layout (DRIVE is not included)</summary>
+
+Download DRIVE from <https://drive.grand-challenge.org/> and keep the original file names:
 
 ```
 data/DRIVE/
   training/  images/21_training.tif   1st_manual/21_manual1.gif   mask/21_training_mask.gif   (ids 21-40)
   test/      images/01_test.tif       1st_manual/01_manual1.gif   mask/01_test_mask.gif       (ids 01-20)
 ```
+</details>
 
-Evaluation needs the test labels (`test/1st_manual/`). Some copies of DRIVE
-leave them out.
+<details>
+<summary>Useful options</summary>
 
-## How SGL works
-
-**The problem:** hand-drawn labels often miss thin vessels. A model trained
-only on those labels learns to miss them too.
-
-**The idea:** let a "study group" of models produce a second opinion for every
-training image.
-
-1. Split the 20 training images randomly into **K groups** (K = 8, as in the
-   paper).
-2. For each group, train a model on the **other** groups. Then let it label the
-   images of its own group, which it has never seen. These labels are called
-   **pseudo-labels**.
-3. Train the final model on **both** label types:
-   `loss = BCE(prediction, manual label) + BCE(prediction, pseudo-label)`
-4. Use only the final model for prediction.
-
-**SGL is a training method, not a prediction step.** A new photo only goes
-through the two networks shown at the top of the diagram:
-- **EnhanceNet** makes an enhanced version of the image.
-- **SegNet** marks the vessels in it.
-
-To get the final map, the prediction is averaged over 8 flipped copies of the
-image and cut off at a probability of 100/255.
-
-## Project structure
-
-```
-assets/architecture.svg  diagram used in this README
-src/model.py             the model: EnhanceNet + SegNet (two U-Nets)
-src/dataset.py           DRIVE loading and augmentation
-src/losses.py            SGL loss (manual label + pseudo-label)
-src/sgl_labeling.py      SGL: K-fold training and pseudo-labels
-src/train.py             train one model
-src/run_sgl.py           full pipeline: pseudo-labels -> final model -> test evaluation
-src/evaluate.py          test-set evaluation
-src/infer.py             predict vessels on your own images
-src/metrics.py           accuracy, sensitivity, specificity, AUC, Dice, IoU
-src/visualize.py         saves vessel maps, overlays and error images
-src/utils.py             device, seeds, checkpoints, 8-way averaging
-src/config.py            default paths and settings
-```
-
-## Installation
-
-On a Mac:
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-The device is chosen automatically: CUDA GPU, then Apple MPS, then CPU. To pick
-one yourself, use `--device cuda`, `--device mps` or `--device cpu`.
-
-On Google Colab:
-1. Choose **Runtime > Change runtime type > GPU**.
-2. Clone the repository.
-3. Run `pip install -r requirements.txt`.
-4. Add `--device cuda --workers 2` to the commands below.
-
-## Training, evaluation and inference
-
-Run these from the project folder.
-
-```bash
-# Full pipeline: SGL pseudo-labels -> final model -> one test-set evaluation
-python src/run_sgl.py --k 8 --fold-epochs 15 --final-epochs 25
-
-# Or run the steps one by one
-python src/sgl_labeling.py --k 8 --epochs 15
-python src/train.py --teacher-dir outputs/pseudo_labels --epochs 25 --out-dir checkpoints/final
-
-# Evaluate a saved model on the DRIVE test set
-python src/evaluate.py --ckpt checkpoints/final/last.pt
-
-# Vessel map for any retina photo
-python src/infer.py --ckpt checkpoints/final/last.pt \
-    --images data/DRIVE/test/images/01_test.tif --masks data/DRIVE/test/mask/01_test_mask.gif
-```
-
-| Option | What it does |
+| Option | Effect |
 |---|---|
-| `--patch-size 256` | training crop size (the default is 128; the paper uses 256) |
-| `--val-ids 37 38 39 40` | hold out these training images and keep the best epoch |
+| `--patch-size 256` | training crop size (default 128; the paper uses 256) |
+| `--val-ids 37 38 39 40` | hold out training images to pick the best epoch |
 | `--resume` | continue a stopped run |
-| `--root PATH` | DRIVE folder, if it is not in `data/DRIVE` |
+| `--root PATH` | DRIVE folder, if not `data/DRIVE` |
+</details>
 
-Run any script with `--help` to see all of its options.
+**Outputs:** pseudo-labels in `outputs/pseudo_labels/`, models in `checkpoints/`, scores in
+`outputs/test_results.json`, vessel maps / overlays / error images in `outputs/test_predictions/`.
 
-**Where results go:**
-- pseudo-labels: `outputs/pseudo_labels/`
-- models: `checkpoints/`
-- test scores: `outputs/test_results.json`
-- vessel maps, overlays and error images: `outputs/test_predictions/`
+## Code map
 
-The test set is used only once, at the end. It is never used to choose a
-model. Scores are measured **inside the eye area** (the field of view).
+| File | Role |
+|---|---|
+| `src/model.py` | EnhanceNet + SegNet |
+| `src/dataset.py` | DRIVE loading and augmentation |
+| `src/losses.py` | SGL loss (manual + pseudo-label) |
+| `src/sgl_labeling.py` | K-fold training and pseudo-labels |
+| `src/train.py` | train one model |
+| `src/run_sgl.py` | full pipeline |
+| `src/evaluate.py` · `src/metrics.py` | test evaluation: Acc, Se, Sp, AUC, Dice, IoU |
+| `src/infer.py` · `src/visualize.py` | predictions on new images and saved figures |
+| `src/utils.py` · `src/config.py` | device, seeds, checkpoints, 8-flip averaging, defaults |
 
-## Status and limitations
+## What we changed from the starting code
 
-- **Results are pending.** The model has not been trained or evaluated on DRIVE
-  yet.
-- **Paper results, for reference only:** the authors report Se 0.8380,
-  Sp 0.9834, Acc 0.9705, AUC 0.9886 and F1 0.8316 on DRIVE. These are the
-  paper's numbers, not this project's.
-- **No noisy-label experiments yet.** The paper also tests SGL on labels with
-  vessels removed on purpose. That part is not included here; the official
-  code has a notebook for it.
-- **Some settings are not in the paper.** The learning rate, number of epochs,
-  batch size and threshold come from the reference code.
-- **Files that came with the copied code:** `checkpoints/sgl_final.pt` and
-  `outputs/` are not results of this project, and Git ignores them.
+This project began as a copy of
+[Tejmul/Retinal--Vessel-Segmentation](https://github.com/Tejmul/Retinal--Vessel-Segmentation).
+We fixed how it is evaluated and trained:
 
-## References and credits
+- ✅ The model is no longer chosen using the test set
+- ✅ Scores count only pixels inside the eye area
+- ✅ Random study groups with K = 8, as in the paper
+- ✅ Image, label and pseudo-label get the same warping
+- ✅ Pseudo-labels are 0 outside the eye
+- ✅ All random numbers are seeded; runs can be resumed
+- ✅ Works with the original DRIVE file names
+- ✅ Added inference and visual outputs
 
-- **Paper:** Yuqian Zhou, Hanchao Yu, Humphrey Shi. *Study Group Learning:
-  Improving Retinal Vessel Segmentation Trained with Noisy Labels.* MICCAI 2021.
-  [arXiv:2103.03451](https://arxiv.org/abs/2103.03451)
-- **Official code** (MIT License):
-  [SHI-Labs/SGL-Retinal-Vessel-Segmentation](https://github.com/SHI-Labs/SGL-Retinal-Vessel-Segmentation).
-  The model in `src/model.py` follows its `model/con.py`.
-- **Starting code:** this project began as a copy of
-  [Tejmul/Retinal--Vessel-Segmentation](https://github.com/Tejmul/Retinal--Vessel-Segmentation),
-  a PyTorch reproduction of the paper.
-- **Dataset:** J. Staal et al. *Ridge-based vessel segmentation in color images
-  of the retina.* IEEE TMI, 2004.
+Scores that came with the starting code (`checkpoints/sgl_final.pt`, `outputs/`) are not ours
+and are ignored by Git.
 
-**What I changed from the starting code:**
-- The model is no longer chosen using the test set.
-- Scores are measured inside the eye area.
-- The code works with the original DRIVE file names.
-- Study groups are split randomly, with K = 8 as in the paper.
-- Pseudo-labels are 0 outside the eye.
-- The image and its labels now get the same warping.
-- Random seeds now cover all random numbers.
-- Runs can be resumed.
-- Added inference and visual outputs.
+**Not covered yet:** the paper's noisy-label experiments (labels with vessels removed on purpose).
+Learning rate, epochs, batch size and threshold come from the reference code, not the paper.
+
+## Credits
+
+- Y. Zhou, H. Yu, H. Shi. *Study Group Learning: Improving Retinal Vessel Segmentation Trained
+  with Noisy Labels.* MICCAI 2021. [arXiv:2103.03451](https://arxiv.org/abs/2103.03451)
+- Official code (MIT): [SHI-Labs/SGL-Retinal-Vessel-Segmentation](https://github.com/SHI-Labs/SGL-Retinal-Vessel-Segmentation); `src/model.py` follows its `model/con.py`
+- J. Staal et al. *Ridge-based vessel segmentation in color images of the retina.* IEEE TMI, 2004 (DRIVE)
 
 ```bibtex
 @inproceedings{zhou2021study,
   title={Study group learning: Improving retinal vessel segmentation trained with noisy labels},
   author={Zhou, Yuqian and Yu, Hanchao and Shi, Humphrey},
-  booktitle={International Conference on Medical Image Computing and Computer-Assisted Intervention},
+  booktitle={MICCAI},
   pages={57--67},
-  year={2021},
-  organization={Springer}
+  year={2021}
 }
 ```
