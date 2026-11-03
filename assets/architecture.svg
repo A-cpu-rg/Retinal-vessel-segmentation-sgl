@@ -1,0 +1,195 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1100 720" width="1100" height="720" font-family="'Segoe UI', -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>SGL retinal vessel segmentation: how a photo becomes a vessel map, and how the model is trained</title>
+  <defs>
+    <linearGradient id="gBlue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="gTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14b8a6"/><stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+    <linearGradient id="gCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f5f9"/>
+    </linearGradient>
+    <linearGradient id="gBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fbff"/><stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+    <radialGradient id="gFundus" cx="0.45" cy="0.45" r="0.6">
+      <stop offset="0" stop-color="#f9b26b"/><stop offset="0.6" stop-color="#e0662f"/><stop offset="1" stop-color="#9a3412"/>
+    </radialGradient>
+    <radialGradient id="gEnh" cx="0.45" cy="0.45" r="0.6">
+      <stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#94a3b8"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#0f172a" flood-opacity="0.18"/>
+    </filter>
+    <marker id="arBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arTeal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0f766e"/>
+    </marker>
+    <marker id="arSlate" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <clipPath id="clipEye"><circle r="97"/></clipPath>
+
+    <!-- drawn vessel tree, in a 200 x 200 box centred on 0,0 (optic disc at x = 35) -->
+    <g id="vtree" fill="none" stroke-linecap="round" clip-path="url(#clipEye)">
+      <path stroke-width="6" d="M35,-4 C10,-30 -20,-55 -60,-62 M35,4 C10,30 -20,55 -60,62"/>
+      <path stroke-width="5" d="M35,-4 C22,-40 2,-70 -15,-95 M35,4 C22,40 2,70 -15,95"/>
+      <path stroke-width="4" d="M35,0 C0,-8 -40,-12 -90,-26 M35,0 C0,8 -40,12 -90,26"/>
+      <path stroke-width="3" d="M-20,-55 C-35,-36 -58,-32 -84,-40 M-20,55 C-35,36 -58,32 -84,40"/>
+      <path stroke-width="3" d="M8,-32 C22,-56 46,-70 66,-74 M8,32 C22,56 46,70 66,74"/>
+      <path stroke-width="3" d="M50,-8 C66,-30 77,-52 74,-72 M50,8 C66,30 77,52 74,72"/>
+      <path stroke-width="2" d="M-48,-60 C-55,-75 -50,-88 -40,-95 M-48,60 C-55,75 -50,88 -40,95 M-60,-16 C-70,-2 -80,0 -96,-4"/>
+    </g>
+    <symbol id="eye" viewBox="-100 -100 200 200">
+      <circle r="97" fill="url(#gFundus)"/>
+      <circle cx="-25" cy="0" r="14" fill="#7c2d12" opacity="0.25"/>
+      <use xlink:href="#vtree" href="#vtree" stroke="#8b1e0f" opacity="0.85"/>
+      <ellipse cx="38" cy="0" rx="13" ry="16" fill="#fde68a" opacity="0.95"/>
+      <circle r="97" fill="none" stroke="#7c2d12" stroke-width="3"/>
+    </symbol>
+    <symbol id="enh" viewBox="-100 -100 200 200">
+      <circle r="97" fill="url(#gEnh)"/>
+      <use xlink:href="#vtree" href="#vtree" stroke="#0f172a"/>
+      <circle r="97" fill="none" stroke="#e2e8f0" stroke-width="4"/>
+    </symbol>
+    <symbol id="mask" viewBox="-100 -100 200 200">
+      <circle r="97" fill="#020617"/>
+      <use xlink:href="#vtree" href="#vtree" stroke="#f8fafc"/>
+      <circle r="97" fill="none" stroke="#334155" stroke-width="4"/>
+    </symbol>
+  </defs>
+
+  <!-- card background -->
+  <rect x="1" y="1" width="1098" height="718" rx="22" fill="url(#gBg)" stroke="#e2e8f0" stroke-width="2"/>
+
+  <!-- ===================== 1. PREDICTION ===================== -->
+  <rect x="30" y="34" width="34" height="34" rx="17" fill="#2563eb"/>
+  <text x="47" y="58" font-size="19" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+  <text x="78" y="58" font-size="19" font-weight="700" fill="#0f172a" letter-spacing="0.5">PREDICTION</text>
+  <text x="208" y="58" font-size="16" fill="#475569">what happens to a new retina photo</text>
+
+  <!-- input photo -->
+  <circle cx="115" cy="216" r="64" fill="#ffffff" filter="url(#shadow)"/>
+  <use xlink:href="#eye" href="#eye" x="53" y="154" width="124" height="124"/>
+  <text x="115" y="314" font-size="18" font-weight="700" fill="#0f172a" text-anchor="middle">Retina photo</text>
+  <text x="115" y="336" font-size="14.5" fill="#475569" text-anchor="middle">colour image of the eye</text>
+
+
+  <!-- the model: two U-Nets in a row -->
+  <rect x="250" y="102" width="582" height="236" rx="20" fill="#eff6ff" fill-opacity="0.7" stroke="#93c5fd" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="272" y="133" font-size="14.5" font-weight="700" fill="#1d4ed8" letter-spacing="0.6">THE MODEL</text>
+  <text x="372" y="133" font-size="14.5" fill="#475569">two U-Net networks in a row</text>
+  <line x1="186" y1="216" x2="266" y2="216" stroke="#2563eb" stroke-width="4" marker-end="url(#arBlue)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="275" y="162" width="240" height="124" rx="16" fill="#1e3a8a"/>
+    <rect x="275" y="154" width="240" height="124" rx="16" fill="url(#gBlue)"/>
+  </g>
+  <rect x="276.5" y="155.5" width="237" height="121" rx="15" fill="none" stroke="#ffffff" stroke-opacity="0.28"/>
+  <use xlink:href="#enh" href="#enh" x="292" y="189" width="54" height="54"/>
+  <text x="360" y="205" font-size="20" font-weight="700" fill="#ffffff">Image</text>
+  <text x="360" y="229" font-size="20" font-weight="700" fill="#ffffff">Enhancement</text>
+  <text x="360" y="254" font-size="14" fill="#dbeafe">EnhanceNet (U-Net)</text>
+
+  <line x1="517" y1="216" x2="560" y2="216" stroke="#2563eb" stroke-width="4" marker-end="url(#arBlue)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="565" y="162" width="244" height="124" rx="16" fill="#1e3a8a"/>
+    <rect x="565" y="154" width="244" height="124" rx="16" fill="url(#gBlue)"/>
+  </g>
+  <rect x="566.5" y="155.5" width="241" height="121" rx="15" fill="none" stroke="#ffffff" stroke-opacity="0.28"/>
+  <use xlink:href="#mask" href="#mask" x="582" y="189" width="54" height="54"/>
+  <text x="650" y="205" font-size="20" font-weight="700" fill="#ffffff">Vessel</text>
+  <text x="650" y="229" font-size="20" font-weight="700" fill="#ffffff">Segmentation</text>
+  <text x="650" y="254" font-size="14" fill="#dbeafe">SegNet (U-Net)</text>
+
+  <text x="541" y="318" font-size="14" fill="#475569" text-anchor="middle">Only the vessel map is compared with labels; the enhancement is learned through it.</text>
+
+  <line x1="840" y1="216" x2="906" y2="216" stroke="#2563eb" stroke-width="4" marker-end="url(#arBlue)"/>
+
+  <!-- output -->
+  <circle cx="980" cy="216" r="64" fill="#ffffff" filter="url(#shadow)"/>
+  <use xlink:href="#mask" href="#mask" x="918" y="154" width="124" height="124"/>
+  <text x="980" y="314" font-size="18" font-weight="700" fill="#0f172a" text-anchor="middle">Vessel map</text>
+  <text x="980" y="336" font-size="14.5" fill="#475569" text-anchor="middle">white = blood vessel</text>
+
+  <!-- trained model goes back up into the model box -->
+  <path d="M982,460 V376 H541 V346" fill="none" stroke="#2563eb" stroke-width="3" stroke-dasharray="7 6" marker-end="url(#arBlue)"/>
+  <rect x="640" y="364" width="242" height="24" rx="12" fill="#ffffff" stroke="#bfdbfe"/>
+  <text x="761" y="381" font-size="14" font-weight="600" fill="#1d4ed8" text-anchor="middle">trained weights are used here</text>
+
+  <!-- ===================== 2. TRAINING WITH SGL ===================== -->
+  <rect x="30" y="398" width="34" height="34" rx="17" fill="#0f766e"/>
+  <text x="47" y="422" font-size="19" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+  <text x="78" y="422" font-size="19" font-weight="700" fill="#0f172a" letter-spacing="0.5">TRAINING</text>
+  <text x="178" y="422" font-size="16" fill="#475569">with Study Group Learning (done once, before prediction)</text>
+
+  <!-- A: data card (stacked) -->
+  <g filter="url(#shadow)">
+    <rect x="42" y="452" width="176" height="128" rx="14" fill="#e2e8f0" stroke="#cbd5e1"/>
+    <rect x="36" y="458" width="176" height="128" rx="14" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <rect x="30" y="464" width="176" height="128" rx="14" fill="url(#gCard)" stroke="#94a3b8" stroke-width="1.5"/>
+  </g>
+  <use xlink:href="#eye" href="#eye" x="62" y="478" width="44" height="44"/>
+  <use xlink:href="#mask" href="#mask" x="116" y="478" width="44" height="44"/>
+  <text x="118" y="548" font-size="17" font-weight="700" fill="#0f172a" text-anchor="middle">Photos + labels</text>
+  <text x="118" y="572" font-size="14" fill="#475569" text-anchor="middle">20 DRIVE images</text>
+
+  <line x1="214" y1="528" x2="242" y2="528" stroke="#0f766e" stroke-width="4" marker-end="url(#arTeal)"/>
+
+  <!-- B: K-fold training -->
+  <g filter="url(#shadow)">
+    <rect x="246" y="472" width="176" height="124" rx="14" fill="#134e4a"/>
+    <rect x="246" y="464" width="176" height="124" rx="14" fill="url(#gTeal)"/>
+  </g>
+  <text x="334" y="500" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">K-fold</text>
+  <text x="334" y="523" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">model training</text>
+  <text x="334" y="549" font-size="14" fill="#ccfbf1" text-anchor="middle">8 groups, 8 models;</text>
+  <text x="334" y="569" font-size="14" fill="#ccfbf1" text-anchor="middle">each skips one group</text>
+
+  <line x1="426" y1="528" x2="458" y2="528" stroke="#0f766e" stroke-width="4" marker-end="url(#arTeal)"/>
+
+  <!-- C: pseudo-labels -->
+  <g filter="url(#shadow)">
+    <rect x="462" y="472" width="176" height="124" rx="14" fill="#134e4a"/>
+    <rect x="462" y="464" width="176" height="124" rx="14" fill="url(#gTeal)"/>
+  </g>
+  <text x="550" y="500" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">Pseudo-label</text>
+  <text x="550" y="523" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">generation</text>
+  <text x="550" y="549" font-size="14" fill="#ccfbf1" text-anchor="middle">each model labels the</text>
+  <text x="550" y="569" font-size="14" fill="#ccfbf1" text-anchor="middle">group it never saw</text>
+
+  <line x1="642" y1="528" x2="674" y2="528" stroke="#0f766e" stroke-width="4" marker-end="url(#arTeal)"/>
+
+  <!-- D: training with SGL -->
+  <g filter="url(#shadow)">
+    <rect x="678" y="472" width="176" height="124" rx="14" fill="#134e4a"/>
+    <rect x="678" y="464" width="176" height="124" rx="14" fill="url(#gTeal)"/>
+  </g>
+  <text x="766" y="500" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">Training</text>
+  <text x="766" y="523" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">with SGL</text>
+  <text x="766" y="549" font-size="14" fill="#ccfbf1" text-anchor="middle">learns from manual</text>
+  <text x="766" y="569" font-size="14" fill="#ccfbf1" text-anchor="middle">labels + pseudo-labels</text>
+
+  <line x1="858" y1="528" x2="890" y2="528" stroke="#0f766e" stroke-width="4" marker-end="url(#arTeal)"/>
+
+  <!-- E: final model -->
+  <g filter="url(#shadow)">
+    <rect x="894" y="472" width="176" height="124" rx="14" fill="#1e3a8a"/>
+    <rect x="894" y="464" width="176" height="124" rx="14" fill="url(#gBlue)"/>
+  </g>
+  <text x="982" y="500" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">Final vessel</text>
+  <text x="982" y="523" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">model</text>
+  <text x="982" y="549" font-size="14" fill="#dbeafe" text-anchor="middle">same two U-Nets,</text>
+  <text x="982" y="569" font-size="14" fill="#dbeafe" text-anchor="middle">now trained</text>
+
+  <!-- manual labels also go straight into the SGL training step -->
+  <path d="M118,600 C118,650 766,650 766,606" fill="none" stroke="#64748b" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#arSlate)"/>
+  <rect x="352" y="632" width="232" height="24" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="468" y="649" font-size="14" fill="#334155" text-anchor="middle">manual labels are used here too</text>
+
+  <text x="550" y="696" font-size="13" fill="#64748b" text-anchor="middle">The eye pictures are drawings for explanation, not real model outputs. K = 8 as in the paper.</text>
+</svg>
