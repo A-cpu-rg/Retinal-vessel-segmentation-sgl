@@ -127,19 +127,6 @@ data/DRIVE/
 
 ## What we changed from the starting code
 
-This project began as a copy of
-[Tejmul/Retinal--Vessel-Segmentation](https://github.com/Tejmul/Retinal--Vessel-Segmentation).
-We fixed how it is evaluated and trained:
-
-- ✅ The model is no longer chosen using the test set
-- ✅ Scores count only pixels inside the eye area
-- ✅ Random study groups with K = 8, as in the paper
-- ✅ Image, label and pseudo-label get the same warping
-- ✅ Pseudo-labels are 0 outside the eye
-- ✅ All random numbers are seeded; runs can be resumed
-- ✅ Works with the original DRIVE file names
-- ✅ Added inference and visual outputs
-
 Scores that came with the starting code (`checkpoints/sgl_final.pt`, `outputs/`) are not ours
 and are ignored by Git.
 
