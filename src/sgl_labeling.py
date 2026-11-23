@@ -11,7 +11,7 @@ Pseudo-labels use 8-way self-ensemble (as in the reference code) and are set to
 import argparse
 import json
 import random
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import numpy as np
@@ -45,6 +45,25 @@ def _check_or_write_folds(path, folds_info):
         path.write_text(json.dumps(folds_info, indent=2))
 
 
+def validate_pseudo_labels(out_dir, ids):
+    """Validate that reusable labels exist and were generated for exactly `ids`."""
+    out_dir = Path(out_dir)
+    missing = [str(out_dir / teacher_filename(i)) for i in ids
+               if not (out_dir / teacher_filename(i)).is_file()]
+    if missing:
+        raise FileNotFoundError("Missing pseudo-labels:\n  " + "\n  ".join(missing))
+    manifest = out_dir / "folds.json"
+    if manifest.is_file():
+        info = json.loads(manifest.read_text())
+        manifest_ids = sorted(image_id for fold in info.get("folds", []) for image_id in fold)
+        if manifest_ids != sorted(ids):
+            raise ValueError(
+                f"Pseudo-label manifest {manifest} covers {manifest_ids}, but this run needs "
+                f"{sorted(ids)}. Regenerate labels without --skip-labeling to avoid validation "
+                "leakage or mixed study-group runs."
+            )
+
+
 @torch.no_grad()
 def write_pseudo_labels(model, root, ids, out_dir, device, self_ensemble=True):
     ds = DriveDataset(root, split="training", indices=ids, mode="full")
@@ -59,14 +78,24 @@ def write_pseudo_labels(model, root, ids, out_dir, device, self_ensemble=True):
 
 
 def generate_pseudo_labels(root, out_dir, cfg, k=8, ckpt_dir=CHECKPOINT_DIR / "folds",
-                           device=None, resume=False, self_ensemble=True):
+                           device=None, resume=False, self_ensemble=True, indices=None):
     device = device or get_device("auto")
     out_dir, ckpt_dir = Path(out_dir), Path(ckpt_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    ids = list_ids(root, "training")
+    available = list_ids(root, "training")
+    ids = sorted(indices) if indices is not None else available
+    unknown = sorted(set(ids) - set(available))
+    if unknown:
+        raise ValueError(f"Image ids {unknown} are not training images. Available: {available}")
+    if len(ids) < 2:
+        raise ValueError("At least two training images are required for study groups.")
     folds = make_folds(ids, k, cfg.seed)
-    _check_or_write_folds(out_dir / "folds.json", {"k": k, "seed": cfg.seed, "folds": folds})
+    _check_or_write_folds(
+        out_dir / "folds.json",
+        {"k": k, "seed": cfg.seed, "folds": folds, "config": asdict(cfg),
+         "self_ensemble": self_ensemble},
+    )
     print(f"[sgl] {len(ids)} training images, {k} study groups: "
           + " | ".join(" ".join(f) for f in folds))
 

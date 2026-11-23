@@ -7,8 +7,10 @@ import argparse
 from pathlib import Path
 
 from config import CHECKPOINT_DIR, OUTPUT_DIR, TEACHER_DIR
+from comparison import format_comparison, save_comparison
+from dataset import list_ids
 from evaluate import run_test_evaluation
-from sgl_labeling import generate_pseudo_labels
+from sgl_labeling import generate_pseudo_labels, validate_pseudo_labels
 from train import add_common_args, add_validation_args, config_from_args, train_model
 from utils import get_device
 
@@ -29,6 +31,12 @@ def main():
     ap.add_argument("--no-self-ensemble", action="store_true")
     ap.add_argument("--save-dir", default=str(OUTPUT_DIR / "test_predictions"))
     ap.add_argument("--results", default=str(OUTPUT_DIR / "test_results.json"))
+    ap.add_argument("--with-baseline", action="store_true",
+                    help="also train/evaluate the same model without pseudo-labels")
+    ap.add_argument("--baseline-results",
+                    default=str(OUTPUT_DIR / "baseline_test_results.json"))
+    ap.add_argument("--comparison-results",
+                    default=str(OUTPUT_DIR / "comparison.json"))
     args = ap.parse_args()
 
     device = get_device(args.device)
@@ -36,21 +44,47 @@ def main():
     self_ensemble = not args.no_self_ensemble
     print(f"=== SGL pipeline on {device} ===")
 
+    all_train_ids = list_ids(args.root, "training")
+    val_ids = set(args.val_ids or [])
+    sgl_train_ids = [image_id for image_id in all_train_ids if image_id not in val_ids]
+
     if args.skip_labeling:
+        validate_pseudo_labels(args.teacher_dir, sgl_train_ids)
         print(f"[run] skipping labeling, using pseudo-labels in {args.teacher_dir}")
     else:
         generate_pseudo_labels(args.root, args.teacher_dir,
                                config_from_args(args, args.fold_epochs), k=args.k,
                                ckpt_dir=ckpt_dir / "folds", device=device,
-                               resume=args.resume, self_ensemble=self_ensemble)
+                               resume=args.resume, self_ensemble=self_ensemble,
+                               indices=sgl_train_ids)
 
     print("\n=== Final SGL training (manual labels + pseudo-labels) ===")
     final_ckpt = train_model(args.root, config_from_args(args, args.final_epochs),
                              ckpt_dir / "final", teacher_dir=args.teacher_dir,
                              device=device, resume=args.resume)
 
-    run_test_evaluation(final_ckpt, args.root, device, self_ensemble=self_ensemble,
-                        save_dir=args.save_dir or None, results_path=args.results)
+    sgl_mean, _ = run_test_evaluation(
+        final_ckpt, args.root, device, self_ensemble=self_ensemble,
+        save_dir=args.save_dir or None, results_path=args.results)
+
+    if args.with_baseline:
+        print("\n=== Baseline training (manual labels only) ===")
+        baseline_ckpt = train_model(
+            args.root, config_from_args(args, args.final_epochs), ckpt_dir / "baseline",
+            teacher_dir=None, device=device, resume=args.resume)
+        baseline_save_dir = str(Path(args.save_dir).with_name("baseline_test_predictions")) \
+            if args.save_dir else None
+        baseline_mean, _ = run_test_evaluation(
+            baseline_ckpt, args.root, device, self_ensemble=self_ensemble,
+            save_dir=baseline_save_dir, results_path=args.baseline_results)
+        comparison = save_comparison(
+            args.comparison_results, baseline_mean, sgl_mean,
+            protocol="mean per-image metrics; fov is the primary result",
+            baseline_checkpoint=str(baseline_ckpt), sgl_checkpoint=str(final_ckpt),
+            self_ensemble=self_ensemble)
+        print("\n=== SGL vs baseline (inside FOV) ===")
+        print(format_comparison(comparison))
+        print(f"[run] comparison written to {args.comparison_results}")
 
 
 if __name__ == "__main__":

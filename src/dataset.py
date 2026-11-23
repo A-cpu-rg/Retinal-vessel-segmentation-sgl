@@ -15,11 +15,9 @@ import math
 import os
 import random
 
-import cv2
 import numpy as np
 import torch
 from PIL import Image
-from scipy.ndimage import gaussian_filter, map_coordinates
 from torch.utils.data import Dataset
 
 from config import PAD_MULTIPLE, SIZE_MULTIPLE
@@ -88,6 +86,15 @@ def elastic_transform(image, alpha, sigma, alpha_affine, rng=np.random, field_ch
     so they stay aligned. The field is built like the reference code built it
     (5 noise channels blurred together), which keeps the same warp strength.
     """
+    try:
+        import cv2
+        from scipy.ndimage import gaussian_filter, map_coordinates
+    except ImportError as exc:
+        raise RuntimeError(
+            "Elastic augmentation requires scipy and opencv-python-headless. "
+            "Install the project requirements or train with --no-elastic."
+        ) from exc
+
     shape = image.shape
     shape_size = shape[:2]
     center_square = np.float32(shape_size) // 2

@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 from config import CHECKPOINT_DIR, DATA_ROOT
 from dataset import DriveDataset, list_ids
 from evaluate import evaluate_dataset
-from losses import SGLoss
+from losses import BCELoss, SGLoss
 from model import build_model
 from utils import (DEVICE_CHOICES, get_device, load_checkpoint, save_checkpoint,
                    seed_worker, set_seed)
@@ -44,6 +44,22 @@ class TrainConfig:
 
 # Settings that may change when resuming (they don't affect what was learned).
 _MAY_CHANGE_ON_RESUME = {"epochs", "workers", "eval_every"}
+
+
+def _validate_config(cfg):
+    positive = {
+        "epochs": cfg.epochs,
+        "batch_size": cfg.batch_size,
+        "patch_size": cfg.patch_size,
+        "lr": cfg.lr,
+        "repeat": cfg.repeat,
+        "eval_every": cfg.eval_every,
+    }
+    bad = [f"{name}={value}" for name, value in positive.items() if value <= 0]
+    if bad:
+        raise ValueError("Training settings must be positive: " + ", ".join(bad))
+    if cfg.workers < 0:
+        raise ValueError(f"workers must be non-negative, got {cfg.workers}")
 
 
 def _checkpoint(model, optimizer, epoch, cfg, run_info, history, best):
@@ -77,8 +93,7 @@ def train_model(root, cfg, out_dir, train_ids=None, teacher_dir=None, device=Non
     images, otherwise last.pt."""
     if cfg.select_metric not in SELECT_METRICS:
         raise ValueError(f"select_metric must be one of {SELECT_METRICS}")
-    if cfg.eval_every < 1:
-        raise ValueError("eval_every must be at least 1")
+    _validate_config(cfg)
     device = device or get_device("auto")
     out_dir = Path(out_dir)
     last_path, best_path = out_dir / "last.pt", out_dir / "best.pt"
@@ -93,6 +108,7 @@ def train_model(root, cfg, out_dir, train_ids=None, teacher_dir=None, device=Non
     if not train_ids:
         raise ValueError("No training images left after removing the validation images.")
     run_info = {"train_ids": train_ids,
+                "objective": "sgl_dual_bce" if teacher_dir is not None else "manual_bce",
                 "teacher_dir": str(teacher_dir) if teacher_dir else None}
 
     set_seed(cfg.seed)
@@ -132,7 +148,9 @@ def train_model(root, cfg, out_dir, train_ids=None, teacher_dir=None, device=Non
                          "patches per epoch; lower --batch-size or raise --repeat.")
     val_ds = (DriveDataset(root, split="training", indices=val_ids, mode="full")
               if val_ids else None)
-    criterion = SGLoss()
+    # Fold and baseline models use the ordinary single-target objective. Only
+    # the final SGL model has a distinct teacher target and uses the dual loss.
+    criterion = SGLoss() if teacher_dir is not None else BCELoss()
 
     for epoch in range(start_epoch, cfg.epochs + 1):
         # Re-seed every epoch so a resumed run gets the same random patches.
@@ -145,7 +163,7 @@ def train_model(root, cfg, out_dir, train_ids=None, teacher_dir=None, device=Non
             te = batch["te"].to(device)
             optimizer.zero_grad()
             _, seg = model(hr)
-            loss = criterion(seg, ve, te)
+            loss = criterion(seg, ve, te) if teacher_dir is not None else criterion(seg, ve)
             loss.backward()
             optimizer.step()
             running += loss.item()
