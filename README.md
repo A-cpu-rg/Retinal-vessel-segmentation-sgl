@@ -5,10 +5,10 @@ DRIVE, using the CON architecture: an EnhanceNet U-Net followed by a SegNet U-Ne
 
 **Authors:** Prerak Arya (230039) and Abhishek Meena (230137)
 
-**Project status:** the baseline and SGL pipelines are implemented and pass unit and synthetic
-end-to-end tests. A real DRIVE training run has **not** been completed because the dataset is not
-included in this repository or available in the audited environment. No project performance
-numbers are claimed yet.
+**Project status:** the baseline and SGL pipelines are implemented and pass unit, synthetic
+end-to-end, and real DRIVE data-loading checks. The complete DRIVE dataset has been downloaded and
+validated locally but remains Git-ignored. The full GPU experiment has **not** finished yet, so no
+project performance numbers are claimed yet.
 
 ![SGL and inference architecture](assets/architecture.svg)
 
@@ -78,8 +78,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Download DRIVE from <https://drive.grand-challenge.org/>. Evaluation requires the test labels,
-which some copies omit. Keep the original names:
+Download DRIVE from the [official challenge](https://drive.grand-challenge.org/Download/), which
+requires registration. Evaluation requires the test labels, which some copies omit. The Colab
+notebook uses a [complete third-party mirror](https://github.com/wfdubowen/Retina-Unet/tree/master/DRIVE)
+containing both manual test annotations; cite DRIVE itself rather than the mirror. Keep the original
+names:
 
 ```text
 data/DRIVE/
@@ -188,9 +191,9 @@ generation, final SGL training, baseline training, evaluation, and comparison. I
 are sanity checks only and must not be presented as research results.
 
 The repository was audited on Python 3.12 with PyTorch 2.9.1 on CPU. Unit tests and the synthetic
-pipeline passed. Full DRIVE training, GPU performance, and elastic augmentation were not exercised
-in that environment because DRIVE and OpenCV were unavailable; OpenCV is included in
-`requirements.txt` for a normal installation.
+pipeline passed. All 40 real DRIVE samples, masks, and first-manual labels were subsequently loaded
+and validated. Full training, GPU performance, and elastic augmentation remain pending; OpenCV is
+included in `requirements.txt` for the Colab and normal local installations.
 
 ## Code map
 
@@ -209,8 +212,9 @@ in that environment because DRIVE and OpenCV were unavailable; OpenCV is include
 
 ## Known limitations
 
-- Real DRIVE metrics remain pending until the dataset and sufficient training hardware are
-  provided. CPU execution is supported but a full `K=8` experiment is expensive.
+- Real DRIVE metrics remain pending until the prepared Colab GPU experiment finishes. CPU execution
+  is supported, but the full `K=8` SGL-plus-baseline experiment is estimated to take 10-12 hours
+  locally.
 - The paper's intentionally corrupted/noisy-label ablations are not implemented; its exact label
   corruption procedure is not fully specified here.
 - Learning rate, epoch count, batch size, and the `100/255` threshold follow the reference-code
