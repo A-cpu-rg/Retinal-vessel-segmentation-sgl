@@ -47,6 +47,27 @@ The last column is from Zhou et al. (2021), not from this implementation. This p
 mean per-image metrics inside the field of view as its primary protocol; whole-image metrics are
 saved separately for comparison with the reference code.
 
+### Verified implementation results
+
+The following results were produced during the repository audit on 23 November 2026. They verify
+that the implementation runs correctly, but they are not DRIVE performance measurements.
+
+| Check | Result |
+|---|---:|
+| Core unit tests | **8/8 passed** |
+| Python source compilation | **passed** |
+| Model forward pass (`1 x 3 x 32 x 48`) | **passed** |
+| DRIVE-format image, label, mask, and teacher loading | **passed** |
+| Fold partition and eight-way transform inversion checks | **passed** |
+| Synthetic fold training and pseudo-label generation | **passed** |
+| Synthetic final SGL and manual-label baseline training | **passed** |
+| Synthetic evaluation and comparison JSON generation | **passed** |
+
+The synthetic integration run used three generated 32 x 32 training images, two generated test
+images, two study groups, one epoch, CPU execution, and no self-ensemble. Its segmentation scores
+are intentionally omitted because random generated images do not measure retinal-vessel quality.
+The CON implementation contains **15,533,320 trainable parameters**.
+
 ## Setup
 
 Python 3.10 or newer is recommended.
