@@ -95,13 +95,24 @@ data/DRIVE/
 
 ## Run the reproducible comparison
 
+### Google Colab GPU (recommended)
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/A-cpu-rg/Retinal-vessel-segmentation-sgl/blob/main/notebooks/full_experiment_colab.ipynb)
+
+The notebook downloads the verified DRIVE mirror, validates all 40 samples, mounts Google Drive
+for resumable checkpoints, runs the full SGL and baseline experiment on a GPU, and prints a
+README-ready metric table. Select a GPU runtime before running all cells. Results persist under
+`MyDrive/retinal_sgl_full_run/`.
+
+### Command line
+
 This command generates out-of-fold labels, trains SGL and baseline models with identical final
 training settings, evaluates each selected checkpoint once, and writes signed metric deltas:
 
 ```bash
 python src/run_sgl.py \
   --k 8 --fold-epochs 15 --final-epochs 25 \
-  --patch-size 256 --val-ids 37 38 39 40 \
+  --patch-size 256 \
   --with-baseline
 ```
 
