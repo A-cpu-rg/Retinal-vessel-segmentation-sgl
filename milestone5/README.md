@@ -2,7 +2,9 @@
 
 [Project overview](../README.md)
 
-The full DRIVE comparison is pending. Use the saved evaluation outputs to
+The [IEEE paper](../report/paper/retinal_sgl_ieee.pdf) includes a completed
+failure analysis for the reduced CPU pilot. The full eight-group DRIVE
+comparison is pending. Use the saved evaluation outputs to
 carry out this review after both model runs finish.
 [Output locations](../milestone4/README.md#review-generated-outputs)
 

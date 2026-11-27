@@ -18,6 +18,8 @@ specificity.
 
 ## Report and experiment records
 
+[IEEE-format report](report/paper/retinal_sgl_ieee.pdf) · [Figures, evidence, and reproduction instructions](report/paper/README.md)
+
 | Milestone | Contents |
 |---|---|
 | [1. Background and base paper](milestone1/README.md) | Retinal vessel segmentation, CON, and the published DRIVE benchmark |
@@ -30,10 +32,10 @@ specificity.
 
 The eight core unit tests and the synthetic end-to-end comparison passed. The
 project previously validated loading all 40 DRIVE images with their manual
-annotations and field-of-view masks. Full DRIVE baseline and SGL scores are
-pending.
+annotations and field-of-view masks. The report includes a measured two-group
+CPU pilot on the 20 DRIVE test images. The full eight-group benchmark is pending.
 
-| Metric | Project baseline | Project SGL | Published SGL (K=8) |
+| Metric | Full-run baseline | Full-run SGL | Published SGL (K=8) |
 |---|---:|---:|---:|
 | Accuracy | Pending | Pending | 0.9705 |
 | Sensitivity | Pending | Pending | 0.8380 |
@@ -76,5 +78,6 @@ resuming the run, and finding the generated metrics and predictions.
 | [milestone1/](milestone1/) through [milestone5/](milestone5/) | Project documentation in experiment order |
 | [src/](src/) | PyTorch model, DRIVE loader, training, SGL, evaluation, and inference |
 | [notebooks/](notebooks/) | End-to-end Colab GPU experiment |
+| [report/paper/](report/paper/) | IEEE paper, figures, and pilot evidence |
 | [assets/](assets/) | Architecture diagram |
 | [tests/](tests/) | Unit checks and a synthetic pipeline smoke test |

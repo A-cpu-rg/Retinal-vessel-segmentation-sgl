@@ -1,0 +1,96 @@
+{
+  "dataset": {
+    "training": {
+      "vessel_fraction": 0.125391016139683,
+      "fov_pixels": 227050.3
+    },
+    "test": {
+      "vessel_fraction": 0.12730248511433742,
+      "fov_pixels": 226907.15,
+      "observer_dice": 0.7881230577943907,
+      "observer_disagreement": 0.052717380006472116,
+      "observer_se": 0.776027267251825,
+      "observer_sp": 0.9724953228515162
+    }
+  },
+  "pilot": {
+    "acc": {
+      "baseline": 0.12740358109230351,
+      "sgl": 0.12730248511433742,
+      "delta": -0.00010109597796609874,
+      "paired_bootstrap_ci": [
+        -0.00013936688012531703,
+        -6.998351034198372e-05
+      ],
+      "improved_images": 0
+    },
+    "se": {
+      "baseline": 0.9999379508638266,
+      "sgl": 1.0,
+      "delta": 6.204913617339769e-05,
+      "paired_bootstrap_ci": [
+        2.5342239883450884e-05,
+        0.0001071600496069827
+      ],
+      "improved_images": 11
+    },
+    "sp": {
+      "baseline": 0.0001255819745804452,
+      "sgl": 0.0,
+      "delta": -0.0001255819745804452,
+      "paired_bootstrap_ci": [
+        -0.00017186957479255871,
+        -8.638534604911808e-05
+      ],
+      "improved_images": 0
+    },
+    "auc": {
+      "baseline": 0.9103257667632935,
+      "sgl": 0.917780733518749,
+      "delta": 0.007454966755455539,
+      "paired_bootstrap_ci": [
+        0.0023869055874446445,
+        0.012112006670942229
+      ],
+      "improved_images": 16
+    },
+    "dice": {
+      "baseline": 0.2256623848814653,
+      "sgl": 0.22565339548124488,
+      "delta": -8.989400220424382e-06,
+      "paired_bootstrap_ci": [
+        -1.7882432378380152e-05,
+        -1.4340994208134068e-06
+      ],
+      "improved_images": 4
+    },
+    "iou_vessel": {
+      "baseline": 0.12730810713098809,
+      "sgl": 0.12730248511433742,
+      "delta": -5.622016650695671e-06,
+      "paired_bootstrap_ci": [
+        -1.1304173208124009e-05,
+        -7.720365995924513e-07
+      ],
+      "improved_images": 4
+    }
+  },
+  "paired_error_counts": {
+    "shared_fn": 0,
+    "recovered_fn": 38,
+    "new_fn": 0,
+    "shared_fp": 3959997,
+    "removed_fp": 0,
+    "new_fp": 497
+  },
+  "quantized_probability_range": {
+    "baseline": [
+      0.2980392156862745,
+      0.9764705882352941
+    ],
+    "sgl": [
+      0.396078431372549,
+      0.9529411764705882
+    ]
+  }
+}
